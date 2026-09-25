@@ -36,8 +36,8 @@ gemini_client = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
-# Gemini model
-GEMINI_MODEL = "gemini-3.8-flash"
+# Use a commonly available Gemini Flash model.
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 # =========================================================
@@ -103,7 +103,7 @@ def main_menu():
                 InlineKeyboardButton(
                     text="ℹ️ Help",
                     callback_data="help"
-                )
+                ),
             ],
         ]
     )
@@ -176,12 +176,13 @@ async def translate_button(callback: CallbackQuery):
     await callback.message.answer(
         "🌐 *Auto Translator*\n\n"
         "ဘာသာပြန်ချင်တဲ့စာကို ပို့ပါ 👇\n\n"
-        "🤖 Bot က မူရင်းဘာသာစကားကို "
-        "အလိုအလျောက်သိပါမယ်။\n\n"
+        "🤖 မူရင်းဘာသာစကားကို အလိုအလျောက်သိပါမယ်။\n\n"
         "🇲🇲 မြန်မာ → 🇬🇧 English\n"
         "🇬🇧 English → 🇲🇲 မြန်မာ\n"
         "🇹🇭 Thai → 🇲🇲 မြန်မာ\n"
-        "🇨🇳 Chinese → 🇲🇲 မြန်မာ\n\n"
+        "🇨🇳 Chinese → 🇲🇲 မြန်မာ\n"
+        "🇯🇵 Japanese → 🇲🇲 မြန်မာ\n"
+        "🇰🇷 Korean → 🇲🇲 မြန်မာ\n\n"
         "🌍 အခြားဘာသာစကားတွေလည်း ရပါတယ်။\n\n"
         "📌 Target language သတ်မှတ်ချင်ရင်:\n"
         "*Translate to English: နေကောင်းလား*",
@@ -198,18 +199,16 @@ async def translate_button(callback: CallbackQuery):
 async def translate_text_with_gemini(text: str):
 
     prompt = f"""
-You are a professional translation assistant.
+You are a professional translator.
 
-Your job is to translate the user's message.
+Detect the source language automatically.
 
-RULES:
+Translation rules:
 
-1. Detect the source language automatically.
-
-2. If the user explicitly requests a target language,
+1. If the user explicitly requests a target language,
    translate into that language.
 
-3. Examples of target language requests:
+2. Target examples:
    - Translate to English
    - Translate to Burmese
    - Translate to Myanmar
@@ -218,28 +217,28 @@ RULES:
    - Translate to Japanese
    - Translate to Korean
 
-4. If the user does NOT specify a target language:
-   - Burmese → English
-   - English → Burmese
-   - Thai → Burmese
-   - Chinese → Burmese
-   - Japanese → Burmese
-   - Korean → Burmese
-   - Other languages → Burmese
+3. If no target language is specified:
+   - Burmese -> English
+   - English -> Burmese
+   - Thai -> Burmese
+   - Chinese -> Burmese
+   - Japanese -> Burmese
+   - Korean -> Burmese
+   - Other languages -> Burmese
 
-5. Preserve the original meaning.
+4. Preserve the original meaning.
 
-6. Make the translation natural and easy to understand.
+5. Make the translation natural.
 
-7. Do not explain anything.
+6. Do not explain anything.
 
-8. Do not add notes.
+7. Do not add notes.
 
-9. Do not add quotation marks.
+8. Do not add quotation marks.
 
-10. Return ONLY the translated text.
+9. Return ONLY the translated text.
 
-USER MESSAGE:
+User message:
 {text}
 """
 
@@ -248,35 +247,36 @@ USER MESSAGE:
         response = await asyncio.to_thread(
             gemini_client.models.generate_content,
             model=GEMINI_MODEL,
-            contents=prompt
+            contents=prompt,
         )
 
-        if not response:
-            return None
+        if response is None:
+            return None, "Empty response from Gemini."
 
         result = response.text
 
         if not result:
-            return None
+            return None, "Gemini returned no text."
 
-        return result.strip()
+        return result.strip(), None
 
     except Exception as e:
+
+        error_text = (
+            f"{type(e).__name__}: {str(e)}"
+        )
 
         print(
             "❌ GEMINI TRANSLATION ERROR:"
         )
 
-        print(
-            type(e).__name__,
-            str(e)
-        )
+        print(error_text)
 
-        return None
+        return None, error_text
 
 
 # =========================================================
-# TEXT MESSAGE
+# TEXT MESSAGE HANDLER
 # =========================================================
 
 @dp.message(F.text)
@@ -284,7 +284,7 @@ async def text_message(message: Message):
 
     text = message.text.strip()
 
-    # Ignore commands
+    # Ignore Telegram commands
     if text.startswith("/"):
         return
 
@@ -292,7 +292,7 @@ async def text_message(message: Message):
         "🌐 ဘာသာပြန်နေပါတယ်... ⏳"
     )
 
-    result = await translate_text_with_gemini(
+    result, error = await translate_text_with_gemini(
         text
     )
 
@@ -307,9 +307,13 @@ async def text_message(message: Message):
 
     else:
 
+        # Show the actual error for debugging
+        safe_error = error or "Unknown error"
+
         await processing.edit_text(
-            "❌ ဘာသာပြန်လို့ မရပါဘူး။\n\n"
-            "Gemini API ကို စစ်ဆေးပေးပါ။"
+            "❌ *Gemini API Error*\n\n"
+            f"`{safe_error}`",
+            parse_mode="Markdown",
         )
 
 
