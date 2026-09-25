@@ -11,17 +11,31 @@ from aiogram.types import (
     CallbackQuery,
 )
 
-from deep_translator import GoogleTranslator
+from google import genai
 
 
 # =========================================================
-# BOT CONFIG
+# CONFIG
 # =========================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set!")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set!")
+
+
+# Gemini client
+gemini_client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
+
+# Gemini model
+GEMINI_MODEL = "gemini-3.6-flash"
+
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -32,6 +46,7 @@ dp = Dispatcher()
 # =========================================================
 
 def main_menu():
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -85,7 +100,7 @@ def main_menu():
 
 
 # =========================================================
-# /START
+# START
 # =========================================================
 
 @dp.message(CommandStart())
@@ -103,7 +118,7 @@ async def start(message: Message):
 
 
 # =========================================================
-# /HELP
+# HELP
 # =========================================================
 
 @dp.message(Command("help"))
@@ -125,7 +140,7 @@ async def help_command(message: Message):
 
 
 # =========================================================
-# AI CHAT
+# AI CHAT PLACEHOLDER
 # =========================================================
 
 @dp.callback_query(F.data == "ai")
@@ -133,8 +148,8 @@ async def ai_button(callback: CallbackQuery):
 
     await callback.message.answer(
         "🤖 *AI Chat*\n\n"
-        "AI Chat feature ကို နောက်တစ်ဆင့်မှာ "
-        "AI API နဲ့ ချိတ်ပေးမယ်။",
+        "AI Chat ကို နောက်အဆင့်မှာ Gemini နဲ့ "
+        "ချိတ်ပေးမယ်။",
         parse_mode="Markdown",
     )
 
@@ -151,11 +166,18 @@ async def translate_button(callback: CallbackQuery):
     await callback.message.answer(
         "🌐 *Auto Translator*\n\n"
         "ဘာသာပြန်ချင်တဲ့စာကို ပို့ပါ 👇\n\n"
-        "🤖 Bot က မူရင်းဘာသာစကားကို အလိုအလျောက်သိပြီး\n"
-        "🇲🇲 မြန်မာဘာသာသို့ ဘာသာပြန်ပေးပါမယ်။\n\n"
+        "🤖 Bot က မူရင်းဘာသာစကားကို "
+        "အလိုအလျောက်သိပါမယ်။\n\n"
+        "🇲🇲 မြန်မာ\n"
+        "🇬🇧 English\n"
+        "🇹🇭 Thai\n"
+        "🇨🇳 Chinese\n"
+        "🌍 အခြားဘာသာစကားများ\n\n"
+        "📌 မူရင်းဘာသာစကားနဲ့ "
+        "ဘာသာပြန်လိုတဲ့ဘာသာစကားကို "
+        "စာထဲမှာပြောနိုင်ပါတယ်။\n\n"
         "ဥပမာ:\n"
-        "🇬🇧 Hello, how are you?\n"
-        "➡️ 🇲🇲 မင်္ဂလာပါ၊ နေကောင်းလား။",
+        "Translate to English: နေကောင်းလား",
         parse_mode="Markdown",
     )
 
@@ -163,33 +185,64 @@ async def translate_button(callback: CallbackQuery):
 
 
 # =========================================================
-# AUTO TRANSLATOR
+# GEMINI TRANSLATION
 # =========================================================
 
-async def translate_to_myanmar(text: str):
+async def translate_with_gemini(text: str):
+
+    prompt = f"""
+You are a professional translator.
+
+Translate the user's text accurately and naturally.
+
+IMPORTANT RULES:
+1. Detect the source language automatically.
+2. If the user explicitly says "Translate to English", translate to English.
+3. If the user explicitly says "Translate to Thai", translate to Thai.
+4. If the user explicitly says "Translate to Chinese", translate to Chinese.
+5. If the user explicitly says "Translate to Burmese" or "Myanmar", translate to Burmese.
+6. If no target language is specified:
+   - If the source is Burmese, translate to English.
+   - If the source is English, translate to Burmese.
+   - If the source is Thai, translate to Burmese.
+   - If the source is Chinese, translate to Burmese.
+   - For other languages, translate to Burmese.
+7. Keep the original meaning.
+8. Do not explain the translation.
+9. Return ONLY the translated text.
+10. Do not add quotation marks.
+
+User text:
+{text}
+"""
 
     try:
 
-        translator = GoogleTranslator(
-            source="auto",
-            target="my"
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model=GEMINI_MODEL,
+            contents=prompt
         )
 
-        result = await asyncio.to_thread(
-            translator.translate,
-            text
-        )
+        result = response.text
 
-        return result
+        if not result:
+            return None
+
+        return result.strip()
 
     except Exception as e:
 
         print(
-            f"❌ Translation error: {e}"
+            f"❌ Gemini translation error: {type(e).__name__}: {e}"
         )
 
         return None
 
+
+# =========================================================
+# TEXT MESSAGE HANDLER
+# =========================================================
 
 @dp.message(F.text)
 async def translate_text(message: Message):
@@ -200,27 +253,26 @@ async def translate_text(message: Message):
     if text.startswith("/"):
         return
 
-    # Show processing message
     processing = await message.answer(
         "🌐 ဘာသာပြန်နေပါတယ်... ⏳"
     )
 
-    result = await translate_to_myanmar(text)
+    result = await translate_with_gemini(text)
 
     if result:
 
         await processing.edit_text(
             "🌐 *Auto Translator*\n\n"
             f"📝 မူရင်းစာ:\n{text}\n\n"
-            f"🇲🇲 *မြန်မာဘာသာပြန်ချက်:*\n{result}",
+            f"🔤 *ဘာသာပြန်ချက်:*\n{result}",
             parse_mode="Markdown",
         )
 
     else:
 
         await processing.edit_text(
-            "❌ ဘာသာပြန်လို့ မရသေးပါဘူး။\n\n"
-            "ခဏနေ ပြန်စမ်းကြည့်ပါ။"
+            "❌ ဘာသာပြန်လို့ မရပါဘူး။\n\n"
+            "Gemini API ကို စစ်ဆေးပေးပါ။"
         )
 
 
@@ -279,10 +331,7 @@ async def start_web_server():
     await runner.setup()
 
     port = int(
-        os.getenv(
-            "PORT",
-            8080
-        )
+        os.getenv("PORT", 8080)
     )
 
     site = web.TCPSite(
