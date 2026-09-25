@@ -28,16 +28,26 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not set!")
 
 
-# Gemini client
+# =========================================================
+# GEMINI
+# =========================================================
+
 gemini_client = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
 # Gemini model
-GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 
 
-bot = Bot(token=BOT_TOKEN)
+# =========================================================
+# TELEGRAM
+# =========================================================
+
+bot = Bot(
+    token=BOT_TOKEN
+)
+
 dp = Dispatcher()
 
 
@@ -140,7 +150,7 @@ async def help_command(message: Message):
 
 
 # =========================================================
-# AI CHAT PLACEHOLDER
+# AI CHAT
 # =========================================================
 
 @dp.callback_query(F.data == "ai")
@@ -148,8 +158,8 @@ async def ai_button(callback: CallbackQuery):
 
     await callback.message.answer(
         "🤖 *AI Chat*\n\n"
-        "AI Chat ကို နောက်အဆင့်မှာ Gemini နဲ့ "
-        "ချိတ်ပေးမယ်။",
+        "AI Chat ကို နောက်အဆင့်မှာ "
+        "Gemini နဲ့ ချိတ်ပေးမယ်။",
         parse_mode="Markdown",
     )
 
@@ -168,16 +178,13 @@ async def translate_button(callback: CallbackQuery):
         "ဘာသာပြန်ချင်တဲ့စာကို ပို့ပါ 👇\n\n"
         "🤖 Bot က မူရင်းဘာသာစကားကို "
         "အလိုအလျောက်သိပါမယ်။\n\n"
-        "🇲🇲 မြန်မာ\n"
-        "🇬🇧 English\n"
-        "🇹🇭 Thai\n"
-        "🇨🇳 Chinese\n"
-        "🌍 အခြားဘာသာစကားများ\n\n"
-        "📌 မူရင်းဘာသာစကားနဲ့ "
-        "ဘာသာပြန်လိုတဲ့ဘာသာစကားကို "
-        "စာထဲမှာပြောနိုင်ပါတယ်။\n\n"
-        "ဥပမာ:\n"
-        "Translate to English: နေကောင်းလား",
+        "🇲🇲 မြန်မာ → 🇬🇧 English\n"
+        "🇬🇧 English → 🇲🇲 မြန်မာ\n"
+        "🇹🇭 Thai → 🇲🇲 မြန်မာ\n"
+        "🇨🇳 Chinese → 🇲🇲 မြန်မာ\n\n"
+        "🌍 အခြားဘာသာစကားတွေလည်း ရပါတယ်။\n\n"
+        "📌 Target language သတ်မှတ်ချင်ရင်:\n"
+        "*Translate to English: နေကောင်းလား*",
         parse_mode="Markdown",
     )
 
@@ -185,34 +192,54 @@ async def translate_button(callback: CallbackQuery):
 
 
 # =========================================================
-# GEMINI TRANSLATION
+# GEMINI TRANSLATOR
 # =========================================================
 
-async def translate_with_gemini(text: str):
+async def translate_text_with_gemini(text: str):
 
     prompt = f"""
-You are a professional translator.
+You are a professional translation assistant.
 
-Translate the user's text accurately and naturally.
+Your job is to translate the user's message.
 
-IMPORTANT RULES:
+RULES:
+
 1. Detect the source language automatically.
-2. If the user explicitly says "Translate to English", translate to English.
-3. If the user explicitly says "Translate to Thai", translate to Thai.
-4. If the user explicitly says "Translate to Chinese", translate to Chinese.
-5. If the user explicitly says "Translate to Burmese" or "Myanmar", translate to Burmese.
-6. If no target language is specified:
-   - If the source is Burmese, translate to English.
-   - If the source is English, translate to Burmese.
-   - If the source is Thai, translate to Burmese.
-   - If the source is Chinese, translate to Burmese.
-   - For other languages, translate to Burmese.
-7. Keep the original meaning.
-8. Do not explain the translation.
-9. Return ONLY the translated text.
-10. Do not add quotation marks.
 
-User text:
+2. If the user explicitly requests a target language,
+   translate into that language.
+
+3. Examples of target language requests:
+   - Translate to English
+   - Translate to Burmese
+   - Translate to Myanmar
+   - Translate to Thai
+   - Translate to Chinese
+   - Translate to Japanese
+   - Translate to Korean
+
+4. If the user does NOT specify a target language:
+   - Burmese → English
+   - English → Burmese
+   - Thai → Burmese
+   - Chinese → Burmese
+   - Japanese → Burmese
+   - Korean → Burmese
+   - Other languages → Burmese
+
+5. Preserve the original meaning.
+
+6. Make the translation natural and easy to understand.
+
+7. Do not explain anything.
+
+8. Do not add notes.
+
+9. Do not add quotation marks.
+
+10. Return ONLY the translated text.
+
+USER MESSAGE:
 {text}
 """
 
@@ -224,6 +251,9 @@ User text:
             contents=prompt
         )
 
+        if not response:
+            return None
+
         result = response.text
 
         if not result:
@@ -234,18 +264,23 @@ User text:
     except Exception as e:
 
         print(
-            f"❌ Gemini translation error: {type(e).__name__}: {e}"
+            "❌ GEMINI TRANSLATION ERROR:"
+        )
+
+        print(
+            type(e).__name__,
+            str(e)
         )
 
         return None
 
 
 # =========================================================
-# TEXT MESSAGE HANDLER
+# TEXT MESSAGE
 # =========================================================
 
 @dp.message(F.text)
-async def translate_text(message: Message):
+async def text_message(message: Message):
 
     text = message.text.strip()
 
@@ -257,7 +292,9 @@ async def translate_text(message: Message):
         "🌐 ဘာသာပြန်နေပါတယ်... ⏳"
     )
 
-    result = await translate_with_gemini(text)
+    result = await translate_text_with_gemini(
+        text
+    )
 
     if result:
 
@@ -293,7 +330,9 @@ async def menu_buttons(callback: CallbackQuery):
         "help": "ℹ️ Help",
     }
 
-    name = names.get(callback.data)
+    name = names.get(
+        callback.data
+    )
 
     if name:
 
@@ -326,12 +365,17 @@ async def start_web_server():
         health
     )
 
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(
+        app
+    )
 
     await runner.setup()
 
     port = int(
-        os.getenv("PORT", 8080)
+        os.getenv(
+            "PORT",
+            "8080"
+        )
     )
 
     site = web.TCPSite(
@@ -353,15 +397,23 @@ async def start_web_server():
 
 async def main():
 
-    print("🤖 Bot is starting...")
+    print(
+        "🤖 Bot is starting..."
+    )
 
     await start_web_server()
 
-    print("✅ Web server started")
+    print(
+        "✅ Web server started"
+    )
 
-    print("🚀 Telegram bot polling started")
+    print(
+        "🚀 Telegram bot polling started"
+    )
 
-    await dp.start_polling(bot)
+    await dp.start_polling(
+        bot
+    )
 
 
 # =========================================================
@@ -370,4 +422,6 @@ async def main():
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    asyncio.run(
+        main()
+    )
