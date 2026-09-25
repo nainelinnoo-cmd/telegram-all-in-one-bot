@@ -11,7 +11,7 @@ from aiogram.types import (
     CallbackQuery,
 )
 
-from google import genai
+from deep_translator import GoogleTranslator
 
 
 # =========================================================
@@ -19,35 +19,16 @@ from google import genai
 # =========================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set!")
-
-if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY is not set!")
-
-
-# =========================================================
-# GEMINI
-# =========================================================
-
-gemini_client = genai.Client(
-    api_key=GEMINI_API_KEY
-)
-
-# Use a commonly available Gemini Flash model.
-GEMINI_MODEL = "gemini-3.8-flash"
 
 
 # =========================================================
 # TELEGRAM
 # =========================================================
 
-bot = Bot(
-    token=BOT_TOKEN
-)
-
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
@@ -158,8 +139,8 @@ async def ai_button(callback: CallbackQuery):
 
     await callback.message.answer(
         "🤖 *AI Chat*\n\n"
-        "AI Chat ကို နောက်အဆင့်မှာ "
-        "Gemini နဲ့ ချိတ်ပေးမယ်။",
+        "🚧 AI Chat ကို နောက်တစ်ဆင့်မှာ "
+        "ထည့်ပေးမယ်။",
         parse_mode="Markdown",
     )
 
@@ -174,18 +155,18 @@ async def ai_button(callback: CallbackQuery):
 async def translate_button(callback: CallbackQuery):
 
     await callback.message.answer(
-        "🌐 *Auto Translator*\n\n"
-        "ဘာသာပြန်ချင်တဲ့စာကို ပို့ပါ 👇\n\n"
-        "🤖 မူရင်းဘာသာစကားကို အလိုအလျောက်သိပါမယ်။\n\n"
+        "🌐 *Fast Translator*\n\n"
+        "ဘာသာပြန်ချင်တဲ့စာကို တိုက်ရိုက်ပို့ပါ 👇\n\n"
+        "🔄 Auto mode:\n"
         "🇲🇲 မြန်မာ → 🇬🇧 English\n"
         "🇬🇧 English → 🇲🇲 မြန်မာ\n"
         "🇹🇭 Thai → 🇲🇲 မြန်မာ\n"
         "🇨🇳 Chinese → 🇲🇲 မြန်မာ\n"
         "🇯🇵 Japanese → 🇲🇲 မြန်မာ\n"
         "🇰🇷 Korean → 🇲🇲 မြန်မာ\n\n"
-        "🌍 အခြားဘာသာစကားတွေလည်း ရပါတယ်။\n\n"
-        "📌 Target language သတ်မှတ်ချင်ရင်:\n"
-        "*Translate to English: နေကောင်းလား*",
+        "🎯 Target language သတ်မှတ်ချင်ရင်:\n"
+        "`Translate to English: နေကောင်းလား`\n\n"
+        "`Translate to Thai: မင်္ဂလာပါ`",
         parse_mode="Markdown",
     )
 
@@ -193,86 +174,180 @@ async def translate_button(callback: CallbackQuery):
 
 
 # =========================================================
-# GEMINI TRANSLATOR
+# LANGUAGE MAP
 # =========================================================
 
-async def translate_text_with_gemini(text: str):
+LANGUAGE_CODES = {
+    "english": "en",
+    "eng": "en",
+    "en": "en",
 
-    prompt = f"""
-You are a professional translator.
+    "burmese": "my",
+    "myanmar": "my",
+    "မြန်မာ": "my",
+    "မြန်မာစာ": "my",
+    "my": "my",
 
-Detect the source language automatically.
+    "thai": "th",
+    "ထိုင်း": "th",
+    "th": "th",
 
-Translation rules:
+    "chinese": "zh-CN",
+    "china": "zh-CN",
+    "တရုတ်": "zh-CN",
+    "zh": "zh-CN",
 
-1. If the user explicitly requests a target language,
-   translate into that language.
+    "japanese": "ja",
+    "japan": "ja",
+    "ဂျပန်": "ja",
+    "ja": "ja",
 
-2. Target examples:
-   - Translate to English
-   - Translate to Burmese
-   - Translate to Myanmar
-   - Translate to Thai
-   - Translate to Chinese
-   - Translate to Japanese
-   - Translate to Korean
+    "korean": "ko",
+    "korea": "ko",
+    "ကိုရီးယား": "ko",
+    "ko": "ko",
 
-3. If no target language is specified:
-   - Burmese -> English
-   - English -> Burmese
-   - Thai -> Burmese
-   - Chinese -> Burmese
-   - Japanese -> Burmese
-   - Korean -> Burmese
-   - Other languages -> Burmese
+    "french": "fr",
+    "fr": "fr",
 
-4. Preserve the original meaning.
+    "german": "de",
+    "de": "de",
 
-5. Make the translation natural.
+    "spanish": "es",
+    "es": "es",
 
-6. Do not explain anything.
+    "italian": "it",
+    "it": "it",
 
-7. Do not add notes.
+    "russian": "ru",
+    "ru": "ru",
 
-8. Do not add quotation marks.
+    "vietnamese": "vi",
+    "vi": "vi",
 
-9. Return ONLY the translated text.
+    "indonesian": "id",
+    "id": "id",
 
-User message:
-{text}
-"""
+    "malay": "ms",
+    "ms": "ms",
 
-    try:
+    "hindi": "hi",
+    "hi": "hi",
+}
 
-        response = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model=GEMINI_MODEL,
-            contents=prompt,
+
+# =========================================================
+# PARSE TARGET LANGUAGE
+# =========================================================
+
+def parse_translation_request(text: str):
+
+    lower = text.lower().strip()
+
+    prefixes = [
+        "translate to ",
+        "translate into ",
+        "translation to ",
+    ]
+
+    for prefix in prefixes:
+
+        if lower.startswith(prefix):
+
+            remaining = text[len(prefix):].strip()
+
+            if ":" not in remaining:
+                return None, text
+
+            language_part, original_text = (
+                remaining.split(":", 1)
+            )
+
+            language_part = (
+                language_part.strip()
+                .lower()
+            )
+
+            original_text = (
+                original_text.strip()
+            )
+
+            target = LANGUAGE_CODES.get(
+                language_part
+            )
+
+            if target and original_text:
+                return target, original_text
+
+    return None, text
+
+
+# =========================================================
+# FAST TRANSLATOR
+# =========================================================
+
+async def translate_text(text: str):
+
+    target_language, original_text = (
+        parse_translation_request(text)
+    )
+
+    # -----------------------------------------------------
+    # AUTO TARGET
+    # -----------------------------------------------------
+
+    if not target_language:
+
+        # Detect source language
+        detected = await asyncio.to_thread(
+            GoogleTranslator(
+                source="auto",
+                target="en"
+            ).translate,
+            original_text
         )
 
-        if response is None:
-            return None, "Empty response from Gemini."
+        # We don't use the translated result here.
+        # Instead, GoogleTranslator's auto detection
+        # is used again below with the selected target.
 
-        result = response.text
+        # Simple Burmese detection
+        if any(
+            "\u1000" <= char <= "\u109f"
+            for char in original_text
+        ):
+            target_language = "en"
 
-        if not result:
-            return None, "Gemini returned no text."
+        # Thai
+        elif any(
+            "\u0e00" <= char <= "\u0e7f"
+            for char in original_text
+        ):
+            target_language = "my"
 
-        return result.strip(), None
+        else:
+            # English / other Latin languages
+            target_language = "my"
 
-    except Exception as e:
 
-        error_text = (
-            f"{type(e).__name__}: {str(e)}"
+    # -----------------------------------------------------
+    # TRANSLATE
+    # -----------------------------------------------------
+
+    result = await asyncio.to_thread(
+        GoogleTranslator(
+            source="auto",
+            target=target_language
+        ).translate,
+        original_text
+    )
+
+    if not result:
+        raise RuntimeError(
+            "Empty translation result"
         )
 
-        print(
-            "❌ GEMINI TRANSLATION ERROR:"
-        )
-
-        print(error_text)
-
-        return None, error_text
+    return result
 
 
 # =========================================================
@@ -289,31 +364,30 @@ async def text_message(message: Message):
         return
 
     processing = await message.answer(
-        "🌐 ဘာသာပြန်နေပါတယ်... ⏳"
+        "🌐 ဘာသာပြန်နေပါတယ်... ⚡"
     )
 
-    result, error = await translate_text_with_gemini(
-        text
-    )
+    try:
 
-    if result:
+        result = await translate_text(text)
 
         await processing.edit_text(
-            "🌐 *Auto Translator*\n\n"
-            f"📝 မူရင်းစာ:\n{text}\n\n"
-            f"🔤 *ဘာသာပြန်ချက်:*\n{result}",
+            "🌐 *Translation*\n\n"
+            f"📝 {text}\n\n"
+            f"🔤 *{result}*",
             parse_mode="Markdown",
         )
 
-    else:
+    except Exception as e:
 
-        # Show the actual error for debugging
-        safe_error = error or "Unknown error"
+        print(
+            "❌ TRANSLATION ERROR:",
+            str(e)
+        )
 
         await processing.edit_text(
-            "❌ *Gemini API Error*\n\n"
-            f"`{safe_error}`",
-            parse_mode="Markdown",
+            "❌ ဘာသာပြန်လို့ မရသေးပါဘူး။\n\n"
+            "ခဏနေပြီး ပြန်စမ်းကြည့်ပါ။"
         )
 
 
@@ -334,9 +408,7 @@ async def menu_buttons(callback: CallbackQuery):
         "help": "ℹ️ Help",
     }
 
-    name = names.get(
-        callback.data
-    )
+    name = names.get(callback.data)
 
     if name:
 
@@ -369,9 +441,7 @@ async def start_web_server():
         health
     )
 
-    runner = web.AppRunner(
-        app
-    )
+    runner = web.AppRunner(app)
 
     await runner.setup()
 
@@ -401,23 +471,15 @@ async def start_web_server():
 
 async def main():
 
-    print(
-        "🤖 Bot is starting..."
-    )
+    print("🤖 Bot is starting...")
 
     await start_web_server()
 
-    print(
-        "✅ Web server started"
-    )
+    print("✅ Web server started")
 
-    print(
-        "🚀 Telegram bot polling started"
-    )
+    print("🚀 Telegram bot polling started")
 
-    await dp.start_polling(
-        bot
-    )
+    await dp.start_polling(bot)
 
 
 # =========================================================
@@ -426,6 +488,4 @@ async def main():
 
 if __name__ == "__main__":
 
-    asyncio.run(
-        main()
-    )
+    asyncio.run(main())
