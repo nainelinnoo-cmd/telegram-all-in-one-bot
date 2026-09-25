@@ -2,6 +2,7 @@ import os
 import asyncio
 
 from aiohttp import web
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
@@ -25,10 +26,11 @@ if not BOT_TOKEN:
 
 
 # =========================================================
-# TELEGRAM
+# TELEGRAM BOT
 # =========================================================
 
 bot = Bot(token=BOT_TOKEN)
+
 dp = Dispatcher()
 
 
@@ -50,6 +52,7 @@ def main_menu():
                     callback_data="translate"
                 ),
             ],
+
             [
                 InlineKeyboardButton(
                     text="📝 SRT Tools",
@@ -60,6 +63,7 @@ def main_menu():
                     callback_data="video"
                 ),
             ],
+
             [
                 InlineKeyboardButton(
                     text="🖼️ Image Tools",
@@ -70,6 +74,7 @@ def main_menu():
                     callback_data="music"
                 ),
             ],
+
             [
                 InlineKeyboardButton(
                     text="📁 File Tools",
@@ -80,6 +85,7 @@ def main_menu():
                     callback_data="settings"
                 ),
             ],
+
             [
                 InlineKeyboardButton(
                     text="ℹ️ Help",
@@ -91,7 +97,7 @@ def main_menu():
 
 
 # =========================================================
-# START
+# /START
 # =========================================================
 
 @dp.message(CommandStart())
@@ -109,7 +115,7 @@ async def start(message: Message):
 
 
 # =========================================================
-# HELP
+# /HELP
 # =========================================================
 
 @dp.message(Command("help"))
@@ -117,10 +123,12 @@ async def help_command(message: Message):
 
     await message.answer(
         "ℹ️ *Help*\n\n"
+
         "/start — Main Menu\n"
         "/help — Help\n\n"
+
         "🤖 AI Chat\n"
-        "🌐 Translation\n"
+        "🌐 Translator\n"
         "📝 Subtitle / SRT\n"
         "🎬 Video Tools\n"
         "🖼️ Image Tools\n"
@@ -156,16 +164,24 @@ async def translate_button(callback: CallbackQuery):
 
     await callback.message.answer(
         "🌐 *Fast Translator*\n\n"
+
         "ဘာသာပြန်ချင်တဲ့စာကို တိုက်ရိုက်ပို့ပါ 👇\n\n"
-        "🔄 Auto mode:\n"
+
+        "🔄 Auto Translation\n\n"
+
         "🇲🇲 မြန်မာ → 🇬🇧 English\n"
         "🇬🇧 English → 🇲🇲 မြန်မာ\n"
         "🇹🇭 Thai → 🇲🇲 မြန်မာ\n"
         "🇨🇳 Chinese → 🇲🇲 မြန်မာ\n"
         "🇯🇵 Japanese → 🇲🇲 မြန်မာ\n"
         "🇰🇷 Korean → 🇲🇲 မြန်မာ\n\n"
-        "🎯 Target language သတ်မှတ်ချင်ရင်:\n"
+
+        "🎯 Target language သတ်မှတ်ချင်ရင်:\n\n"
+
         "`Translate to English: နေကောင်းလား`\n\n"
+
+        "`Translate to Burmese: How are you?`\n\n"
+
         "`Translate to Thai: မင်္ဂလာပါ`",
         parse_mode="Markdown",
     )
@@ -178,66 +194,82 @@ async def translate_button(callback: CallbackQuery):
 # =========================================================
 
 LANGUAGE_CODES = {
+
+    # English
     "english": "en",
     "eng": "en",
     "en": "en",
 
+    # Burmese
     "burmese": "my",
     "myanmar": "my",
+    "my": "my",
     "မြန်မာ": "my",
     "မြန်မာစာ": "my",
-    "my": "my",
 
+    # Thai
     "thai": "th",
-    "ထိုင်း": "th",
     "th": "th",
+    "ထိုင်း": "th",
 
+    # Chinese
     "chinese": "zh-CN",
     "china": "zh-CN",
-    "တရုတ်": "zh-CN",
     "zh": "zh-CN",
+    "တရုတ်": "zh-CN",
 
+    # Japanese
     "japanese": "ja",
     "japan": "ja",
-    "ဂျပန်": "ja",
     "ja": "ja",
+    "ဂျပန်": "ja",
 
+    # Korean
     "korean": "ko",
     "korea": "ko",
-    "ကိုရီးယား": "ko",
     "ko": "ko",
+    "ကိုရီးယား": "ko",
 
+    # French
     "french": "fr",
     "fr": "fr",
 
+    # German
     "german": "de",
     "de": "de",
 
+    # Spanish
     "spanish": "es",
     "es": "es",
 
+    # Italian
     "italian": "it",
     "it": "it",
 
+    # Russian
     "russian": "ru",
     "ru": "ru",
 
+    # Vietnamese
     "vietnamese": "vi",
     "vi": "vi",
 
+    # Indonesian
     "indonesian": "id",
     "id": "id",
 
+    # Malay
     "malay": "ms",
     "ms": "ms",
 
+    # Hindi
     "hindi": "hi",
     "hi": "hi",
 }
 
 
 # =========================================================
-# PARSE TARGET LANGUAGE
+# PARSE TRANSLATION REQUEST
 # =========================================================
 
 def parse_translation_request(text: str):
@@ -257,6 +289,7 @@ def parse_translation_request(text: str):
             remaining = text[len(prefix):].strip()
 
             if ":" not in remaining:
+
                 return None, text
 
             language_part, original_text = (
@@ -264,22 +297,104 @@ def parse_translation_request(text: str):
             )
 
             language_part = (
-                language_part.strip()
+                language_part
+                .strip()
                 .lower()
             )
 
             original_text = (
-                original_text.strip()
+                original_text
+                .strip()
             )
 
-            target = LANGUAGE_CODES.get(
-                language_part
+            target_language = (
+                LANGUAGE_CODES.get(
+                    language_part
+                )
             )
 
-            if target and original_text:
-                return target, original_text
+            if target_language and original_text:
+
+                return (
+                    target_language,
+                    original_text
+                )
 
     return None, text
+
+
+# =========================================================
+# SIMPLE LANGUAGE DETECTION
+# =========================================================
+
+def detect_target_language(text: str):
+
+    # -----------------------------------------------------
+    # Burmese
+    # -----------------------------------------------------
+
+    if any(
+        "\u1000" <= char <= "\u109f"
+        for char in text
+    ):
+
+        return "en"
+
+
+    # -----------------------------------------------------
+    # Thai
+    # -----------------------------------------------------
+
+    if any(
+        "\u0e00" <= char <= "\u0e7f"
+        for char in text
+    ):
+
+        return "my"
+
+
+    # -----------------------------------------------------
+    # Chinese
+    # -----------------------------------------------------
+
+    if any(
+        "\u4e00" <= char <= "\u9fff"
+        for char in text
+    ):
+
+        return "my"
+
+
+    # -----------------------------------------------------
+    # Japanese
+    # -----------------------------------------------------
+
+    if any(
+        "\u3040" <= char <= "\u30ff"
+        for char in text
+    ):
+
+        return "my"
+
+
+    # -----------------------------------------------------
+    # Korean
+    # -----------------------------------------------------
+
+    if any(
+        "\uac00" <= char <= "\ud7af"
+        for char in text
+    ):
+
+        return "my"
+
+
+    # -----------------------------------------------------
+    # Default
+    # English / Other Latin languages
+    # -----------------------------------------------------
+
+    return "my"
 
 
 # =========================================================
@@ -292,42 +407,18 @@ async def translate_text(text: str):
         parse_translation_request(text)
     )
 
+
     # -----------------------------------------------------
     # AUTO TARGET
     # -----------------------------------------------------
 
     if not target_language:
 
-        # Detect source language
-        detected = await asyncio.to_thread(
-            GoogleTranslator(
-                source="auto",
-                target="en"
-            ).translate,
-            original_text
+        target_language = (
+            detect_target_language(
+                original_text
+            )
         )
-
-        # We don't use the translated result here.
-        # Instead, GoogleTranslator's auto detection
-        # is used again below with the selected target.
-
-        # Simple Burmese detection
-        if any(
-            "\u1000" <= char <= "\u109f"
-            for char in original_text
-        ):
-            target_language = "en"
-
-        # Thai
-        elif any(
-            "\u0e00" <= char <= "\u0e7f"
-            for char in original_text
-        ):
-            target_language = "my"
-
-        else:
-            # English / other Latin languages
-            target_language = "my"
 
 
     # -----------------------------------------------------
@@ -335,23 +426,28 @@ async def translate_text(text: str):
     # -----------------------------------------------------
 
     result = await asyncio.to_thread(
+
         GoogleTranslator(
             source="auto",
             target=target_language
         ).translate,
+
         original_text
     )
 
+
     if not result:
+
         raise RuntimeError(
             "Empty translation result"
         )
+
 
     return result
 
 
 # =========================================================
-# TEXT MESSAGE HANDLER
+# TEXT MESSAGE
 # =========================================================
 
 @dp.message(F.text)
@@ -359,34 +455,65 @@ async def text_message(message: Message):
 
     text = message.text.strip()
 
-    # Ignore Telegram commands
+
+    # -----------------------------------------------------
+    # Ignore commands
+    # -----------------------------------------------------
+
     if text.startswith("/"):
         return
+
+
+    # -----------------------------------------------------
+    # Processing message
+    # -----------------------------------------------------
 
     processing = await message.answer(
         "🌐 ဘာသာပြန်နေပါတယ်... ⚡"
     )
 
+
     try:
 
         result = await translate_text(text)
 
+
+        # -------------------------------------------------
+        # Success
+        # -------------------------------------------------
+
         await processing.edit_text(
+
             "🌐 *Translation*\n\n"
-            f"📝 {text}\n\n"
-            f"🔤 *{result}*",
+
+            f"📝 မူရင်း:\n{text}\n\n"
+
+            f"🔤 *ဘာသာပြန်ချက်:*\n{result}",
+
             parse_mode="Markdown",
         )
 
+
     except Exception as e:
+
+        # -------------------------------------------------
+        # Log error
+        # -------------------------------------------------
 
         print(
             "❌ TRANSLATION ERROR:",
             str(e)
         )
 
+
+        # -------------------------------------------------
+        # User message
+        # -------------------------------------------------
+
         await processing.edit_text(
+
             "❌ ဘာသာပြန်လို့ မရသေးပါဘူး။\n\n"
+
             "ခဏနေပြီး ပြန်စမ်းကြည့်ပါ။"
         )
 
@@ -399,24 +526,46 @@ async def text_message(message: Message):
 async def menu_buttons(callback: CallbackQuery):
 
     names = {
-        "srt": "📝 SRT Tools",
-        "video": "🎬 Video Tools",
-        "image": "🖼️ Image Tools",
-        "music": "🎵 Music Tools",
-        "file": "📁 File Tools",
-        "settings": "⚙️ Settings",
-        "help": "ℹ️ Help",
+
+        "srt":
+            "📝 SRT Tools",
+
+        "video":
+            "🎬 Video Tools",
+
+        "image":
+            "🖼️ Image Tools",
+
+        "music":
+            "🎵 Music Tools",
+
+        "file":
+            "📁 File Tools",
+
+        "settings":
+            "⚙️ Settings",
+
+        "help":
+            "ℹ️ Help",
     }
 
-    name = names.get(callback.data)
+
+    name = names.get(
+        callback.data
+    )
+
 
     if name:
 
         await callback.message.answer(
+
             f"{name}\n\n"
-            "🚧 ဒီ Feature ကို နောက်တစ်ဆင့်မှာ "
+
+            "🚧 ဒီ Feature ကို "
+            "နောက်တစ်ဆင့်မှာ "
             "ထည့်ပေးမယ်။"
         )
+
 
     await callback.answer()
 
@@ -432,18 +581,28 @@ async def health(request):
     )
 
 
+# =========================================================
+# WEB SERVER
+# =========================================================
+
 async def start_web_server():
 
     app = web.Application()
+
 
     app.router.add_get(
         "/",
         health
     )
 
-    runner = web.AppRunner(app)
+
+    runner = web.AppRunner(
+        app
+    )
+
 
     await runner.setup()
+
 
     port = int(
         os.getenv(
@@ -452,16 +611,23 @@ async def start_web_server():
         )
     )
 
+
     site = web.TCPSite(
+
         runner,
+
         "0.0.0.0",
+
         port
     )
 
+
     await site.start()
 
+
     print(
-        f"🌐 Web server running on port {port}"
+        f"🌐 Web server running "
+        f"on port {port}"
     )
 
 
@@ -471,15 +637,27 @@ async def start_web_server():
 
 async def main():
 
-    print("🤖 Bot is starting...")
+    print(
+        "🤖 Bot is starting..."
+    )
+
 
     await start_web_server()
 
-    print("✅ Web server started")
 
-    print("🚀 Telegram bot polling started")
+    print(
+        "✅ Web server started"
+    )
 
-    await dp.start_polling(bot)
+
+    print(
+        "🚀 Telegram bot polling started"
+    )
+
+
+    await dp.start_polling(
+        bot
+    )
 
 
 # =========================================================
@@ -488,4 +666,6 @@ async def main():
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    asyncio.run(
+        main()
+    )
