@@ -11,6 +11,8 @@ from aiogram.types import (
     CallbackQuery,
 )
 
+from deep_translator import GoogleTranslator
+
 
 # =========================================================
 # BOT CONFIG
@@ -88,6 +90,7 @@ def main_menu():
 
 @dp.message(CommandStart())
 async def start(message: Message):
+
     name = message.from_user.first_name or "Friend"
 
     await message.answer(
@@ -105,6 +108,7 @@ async def start(message: Message):
 
 @dp.message(Command("help"))
 async def help_command(message: Message):
+
     await message.answer(
         "ℹ️ *Help*\n\n"
         "/start — Main Menu\n"
@@ -138,21 +142,20 @@ async def ai_button(callback: CallbackQuery):
 
 
 # =========================================================
-# TRANSLATOR
+# TRANSLATOR MENU
 # =========================================================
 
 @dp.callback_query(F.data == "translate")
 async def translate_button(callback: CallbackQuery):
 
     await callback.message.answer(
-        "🌐 *Translator*\n\n"
-        "ဘာသာပြန်ချင်တဲ့စာကို ဒီမှာပို့ပါ။ 👇\n\n"
+        "🌐 *Auto Translator*\n\n"
+        "ဘာသာပြန်ချင်တဲ့စာကို ပို့ပါ 👇\n\n"
+        "🤖 Bot က မူရင်းဘာသာစကားကို အလိုအလျောက်သိပြီး\n"
+        "🇲🇲 မြန်မာဘာသာသို့ ဘာသာပြန်ပေးပါမယ်။\n\n"
         "ဥပမာ:\n"
-        "Hello, how are you?\n\n"
-        "🇬🇧 English → 🇲🇲 Myanmar\n"
-        "🇲🇲 Myanmar → 🇬🇧 English\n\n"
-        "💡 Translation API ကို နောက်အဆင့်မှာ "
-        "ချိတ်ပေးမယ်။",
+        "🇬🇧 Hello, how are you?\n"
+        "➡️ 🇲🇲 မင်္ဂလာပါ၊ နေကောင်းလား။",
         parse_mode="Markdown",
     )
 
@@ -160,27 +163,65 @@ async def translate_button(callback: CallbackQuery):
 
 
 # =========================================================
-# TRANSLATOR TEXT RECEIVER
+# AUTO TRANSLATOR
 # =========================================================
+
+async def translate_to_myanmar(text: str):
+
+    try:
+
+        translator = GoogleTranslator(
+            source="auto",
+            target="my"
+        )
+
+        result = await asyncio.to_thread(
+            translator.translate,
+            text
+        )
+
+        return result
+
+    except Exception as e:
+
+        print(
+            f"❌ Translation error: {e}"
+        )
+
+        return None
+
 
 @dp.message(F.text)
 async def translate_text(message: Message):
 
-    text = message.text
+    text = message.text.strip()
 
-    # Commands ကို Translator မလုပ်စေဖို့
+    # Ignore commands
     if text.startswith("/"):
         return
 
-    await message.answer(
-        "🌐 *Translator*\n\n"
-        "📝 မူရင်းစာ:\n"
-        f"{text}\n\n"
-        "🚧 ဒီစာကို လက်ခံရရှိပါပြီ။\n\n"
-        "🔧 Translation API ကို နောက်အဆင့်မှာ "
-        "ချိတ်ပြီး တကယ်ဘာသာပြန်ပေးမယ်။",
-        parse_mode="Markdown",
+    # Show processing message
+    processing = await message.answer(
+        "🌐 ဘာသာပြန်နေပါတယ်... ⏳"
     )
+
+    result = await translate_to_myanmar(text)
+
+    if result:
+
+        await processing.edit_text(
+            "🌐 *Auto Translator*\n\n"
+            f"📝 မူရင်းစာ:\n{text}\n\n"
+            f"🇲🇲 *မြန်မာဘာသာပြန်ချက်:*\n{result}",
+            parse_mode="Markdown",
+        )
+
+    else:
+
+        await processing.edit_text(
+            "❌ ဘာသာပြန်လို့ မရသေးပါဘူး။\n\n"
+            "ခဏနေ ပြန်စမ်းကြည့်ပါ။"
+        )
 
 
 # =========================================================
@@ -275,7 +316,7 @@ async def main():
 
 
 # =========================================================
-# RUN BOT
+# RUN
 # =========================================================
 
 if __name__ == "__main__":
