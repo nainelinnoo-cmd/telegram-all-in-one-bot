@@ -11,11 +11,23 @@ from aiogram.types import (
     CallbackQuery,
 )
 
+
+# =========================================================
+# BOT CONFIG
+# =========================================================
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN is not set!")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+
+# =========================================================
+# MAIN MENU
+# =========================================================
 
 def main_menu():
     return InlineKeyboardMarkup(
@@ -70,6 +82,10 @@ def main_menu():
     )
 
 
+# =========================================================
+# /START
+# =========================================================
+
 @dp.message(CommandStart())
 async def start(message: Message):
     name = message.from_user.first_name or "Friend"
@@ -82,6 +98,10 @@ async def start(message: Message):
         parse_mode="Markdown",
     )
 
+
+# =========================================================
+# /HELP
+# =========================================================
 
 @dp.message(Command("help"))
 async def help_command(message: Message):
@@ -100,20 +120,77 @@ async def help_command(message: Message):
     )
 
 
+# =========================================================
+# AI CHAT
+# =========================================================
+
 @dp.callback_query(F.data == "ai")
 async def ai_button(callback: CallbackQuery):
+
     await callback.message.answer(
         "🤖 *AI Chat*\n\n"
-        "AI Chat feature ကို နောက်တစ်ဆင့်မှာ API နဲ့ ချိတ်ပေးမယ်။",
+        "AI Chat feature ကို နောက်တစ်ဆင့်မှာ "
+        "AI API နဲ့ ချိတ်ပေးမယ်။",
         parse_mode="Markdown",
     )
+
     await callback.answer()
 
 
+# =========================================================
+# TRANSLATOR
+# =========================================================
+
+@dp.callback_query(F.data == "translate")
+async def translate_button(callback: CallbackQuery):
+
+    await callback.message.answer(
+        "🌐 *Translator*\n\n"
+        "ဘာသာပြန်ချင်တဲ့စာကို ဒီမှာပို့ပါ။ 👇\n\n"
+        "ဥပမာ:\n"
+        "Hello, how are you?\n\n"
+        "🇬🇧 English → 🇲🇲 Myanmar\n"
+        "🇲🇲 Myanmar → 🇬🇧 English\n\n"
+        "💡 Translation API ကို နောက်အဆင့်မှာ "
+        "ချိတ်ပေးမယ်။",
+        parse_mode="Markdown",
+    )
+
+    await callback.answer()
+
+
+# =========================================================
+# TRANSLATOR TEXT RECEIVER
+# =========================================================
+
+@dp.message(F.text)
+async def translate_text(message: Message):
+
+    text = message.text
+
+    # Commands ကို Translator မလုပ်စေဖို့
+    if text.startswith("/"):
+        return
+
+    await message.answer(
+        "🌐 *Translator*\n\n"
+        "📝 မူရင်းစာ:\n"
+        f"{text}\n\n"
+        "🚧 ဒီစာကို လက်ခံရရှိပါပြီ။\n\n"
+        "🔧 Translation API ကို နောက်အဆင့်မှာ "
+        "ချိတ်ပြီး တကယ်ဘာသာပြန်ပေးမယ်။",
+        parse_mode="Markdown",
+    )
+
+
+# =========================================================
+# OTHER MENU BUTTONS
+# =========================================================
+
 @dp.callback_query()
 async def menu_buttons(callback: CallbackQuery):
+
     names = {
-        "translate": "🌐 Translator",
         "srt": "📝 SRT Tools",
         "video": "🎬 Video Tools",
         "image": "🖼️ Image Tools",
@@ -126,26 +203,46 @@ async def menu_buttons(callback: CallbackQuery):
     name = names.get(callback.data)
 
     if name:
+
         await callback.message.answer(
             f"{name}\n\n"
-            "🚧 ဒီ Feature ကို နောက်တစ်ဆင့်မှာ ထည့်ပေးမယ်။"
+            "🚧 ဒီ Feature ကို နောက်တစ်ဆင့်မှာ "
+            "ထည့်ပေးမယ်။"
         )
 
     await callback.answer()
 
 
+# =========================================================
+# RENDER HEALTH CHECK
+# =========================================================
+
 async def health(request):
-    return web.Response(text="Bot is running! 🤖")
+
+    return web.Response(
+        text="Bot is running! 🤖"
+    )
 
 
 async def start_web_server():
+
     app = web.Application()
-    app.router.add_get("/", health)
+
+    app.router.add_get(
+        "/",
+        health
+    )
 
     runner = web.AppRunner(app)
+
     await runner.setup()
 
-    port = int(os.getenv("PORT", 8080))
+    port = int(
+        os.getenv(
+            "PORT",
+            8080
+        )
+    )
 
     site = web.TCPSite(
         runner,
@@ -155,16 +252,32 @@ async def start_web_server():
 
     await site.start()
 
-    print(f"🌐 Web server running on port {port}")
+    print(
+        f"🌐 Web server running on port {port}"
+    )
 
+
+# =========================================================
+# MAIN
+# =========================================================
 
 async def main():
+
     print("🤖 Bot is starting...")
 
     await start_web_server()
 
+    print("✅ Web server started")
+
+    print("🚀 Telegram bot polling started")
+
     await dp.start_polling(bot)
 
 
+# =========================================================
+# RUN BOT
+# =========================================================
+
 if __name__ == "__main__":
+
     asyncio.run(main())
