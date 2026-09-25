@@ -37,7 +37,7 @@ gemini_client = genai.Client(
 )
 
 # Use a commonly available Gemini Flash model.
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 
 
 # =========================================================
